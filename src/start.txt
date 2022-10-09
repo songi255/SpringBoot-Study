@@ -17,4 +17,12 @@
 4. Git 연동
     - 나중에 CLI가 더 익숙해지면 걍 그렇게 써도 된다.
     - Ctrl + Shift + A로 Action 검색하든지, 직접 찾든지.. 여튼 share project on github
-    - 
+    - gradle/wrapper, build.gradle, gradlew, gradlew.bat은 포함. .gradle, .idea는 미포함해서 커밋하자. (근데 깃헙에는 gradle/wrapper가 생성되네.)
+    - github에서 잘 올라갔는지 확인해보자
+    - .gitignore을 작성하자.
+        - IntelliJ에서 기본 지원이 없어서 플러그인 깐다고 하는데, 지금 시점에서는 지원하는 듯 하다.
+        - plugin을 깔고싶다면 .ignore을 검색하자. (플러그인은 설치후에 꼭 IDE를 재시작하자.)
+        - project 선택 후 생성 -> .ignorefile - gitignorefile
+        - 파일의 내용은 .gradle이랑 .idea를 한 줄씩 써주자. 탐색기에서 색이 바래는것을 보니 플러그인 없이도 제대로 적용이 되는게 맞다.
+        - 커밋해보자. (Ctrl + K)
+        - 푸시도 해보자. (Ctrl + Shift + K)
