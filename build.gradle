@@ -53,8 +53,23 @@ dependencies {
     /testCompile('org.springframework.boot:spring-boot-starter-test')도 마찬가지.. /
     implementation('org.springframework.boot:spring-boot-starter-web')
     testImplementation('org.springframework.boot:spring-boot-starter-test')
+
+    /테스트가 안됬던 이유.. settings - Build, Execution, Deployment - Gradle - Run tests using : IntelliJ 로,
+     IntelliJ가 test를 실행하게끔 변경해주어야했다./
+
+    /Lombok의 추가/
+    /implementation('org.projectlombok:lombok');/
+    /이후, lombok plugin까지 설치한다./
+    /IDE 재시작하면 알려준다고는 하는데, 일단 수동설정하겠다.
+    settings - Build, Execution, Deployment - Compiler - Annotaion Processor - Enable annotation processing 체크해주자.
+    다만 이걸 체크하는건 프로젝트마다 해줘야 한다./
+    /롬복도 gradle5 이상에서 바뀌었다고 한다. 이제는 아래와 같이 적어줘야 한다./
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
 }
 
 test {
+    /이거 작동안한다고 하네.. 먼가 변경점이 많은 듯 하다./
     useJUnitPlatform()
+    /useTestNG()/
 }

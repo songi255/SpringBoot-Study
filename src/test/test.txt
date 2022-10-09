@@ -1,0 +1,12 @@
+TDD (Test Driven Development)를 우선 간략하게 소개한다.
+    - 테스트코드를 먼저 작성하는 것 부터 시작한다.
+    - 레드그린사이클
+        - Red : 항상 실패하는 테스트를 먼저 작성하고
+        - Green : 테스트가 통과하는 프로덕션 코드를 작성하고
+        - Refactor : 테스트가 통과하면 프로덕션 코드를 리팩토링한다.
+
+다만 지금 알아볼 것은 Unit Test. 즉, 단위테스트 코드를 배울 것이다.
+    - 혹시 TDD에 대해서 더 알고싶다면 채수원님의 "TDD 실천법과 도구" PDF 를 확인하자. (https://repo.yona.io/doortts/blog/issue/1)
+
+단위테스트 도구에는 xUnit이 있다. 개발환경 x (JUnit, DBUnit, CPPUnit, NUnit(.net))에 따라 Unit 테스트를 도와주는 도구이다.
+아직 많은 회사에서 JUnit5보다 JUnit4를 사용하고 있기에, 여기서도 JUnit4로 진행한다.
