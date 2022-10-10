@@ -1,1 +1,48 @@
 일반적으로 패키지명은 웹사이트 주소명의 역순으로 작성한다.
+
+패키지 구성의 경우
+    - web : 모든 controller들이 여기 담긴다.
+    - dto : 응답 dto들을 담는다.
+    - domain : SW 요구사항 (문제영역)을 담는다.
+        - 기존의 MyBatis와 같은 SQLMapper를 썼다면 dto를 떠올리겠지만, 결이 조금 다르다.
+        - 그간 xml에 쿼리를 담고, Class는 오로지 쿼리 결과만 담던 일들이 모두 domain class 라는 곳에서 해결된다.
+        - domain을 좀 더 자세하게 공부해보고 싶다면 최범균님의 DDD Start를 참고해보자!
+
+
+Spring 웹 계층
+    - 일반적인 프로젝트의 구조라고 생각하면 될 듯.
+    - 기본적으로 5가지의 계층이 있다.
+    - 1. Web Layer
+        - 흔히 사용하는 @Controller, JSP/Freemarker 등 view template 영역
+        - 이외에도 @Filter, 인터셉터, @ControllerAdvice 등 외부요청/응답에 대한 전반적인 영역
+        - 즉, 실제 요청이 일어나는 인터페이스를 의미하는듯...?
+    - 2. Service Layer
+        - @Service에 사용되는 서비스 영역
+        - 일반적으로 Controller와 Dao의 중간영역에서 사용
+        - @Transaction이 사용되어야 하는 영역이기도 함.
+    - 3. Repository Layer
+        - DB 같은 데이터저장소에 접근하는 영역
+        - 기존의 Dao 영역으로 이해하면 쉽다.
+    - 4. DTOs
+        - DTO : 계층간 데이터 교환을 위한 객체
+        - view template engine에서 사용될 객체, Repository Layer에서 결과로 넘겨준 객체 등
+    - 5. Domain Model
+        - domain(개발대상)을 모든 사람이 동일한 관점에서 이해할 수 있고, 공유할 수 있도록 단순화시킨 것
+        - 택시 앱의 경우, domain은 배차, 탑승, 요금 등이다.
+        - @Entity가 사용된 영역 역시 domain model이라고 이해하면 된다. (여기서는 Posts가 되는건가?)
+        - 다만 무조건 DB table과 관계가 있어야만 하는 것은 아니다. VO같은 값 객체들도 이 영역에 해당하기 때문.
+
+    많은 사람들이 Service에서 비즈니스 로직을 처리해야 한다고 오해하고 있는데, Service는 transaction, domain간 순서보장의 역할만 한다.
+    그럼 비즈니스처리는 어디서 해야할까? 바로 Domain이다. (어찌보면 당연. 객체지향 자체가 데이터와 처리방법을 한곳에 묶어놓는 데 의미가 있으니.)
+
+    기존 방식과 비교해보자. 기존처럼 Service에서 처리하던 방식은 transaction script 라고 한다. 예를들면
+        - Dao를 사용해서 Dto에 데이터를 받는다.
+        - Dto에 담긴 값들을 get, set으로 Service 안에서 전부 연산해서 다시 Dao로 update한다.
+        - 모든 로직이 Service에서 처리되니, Service 계층이 존재해야 할 이유가 없다(무의미하다.)
+        - 또한 객체 자체도 그냥 구조체마냥, 단순히 데이터덩어리역할만 한다.
+    반면 도메인모델에서의 처리는 이런식이다.
+        - Repository를 사용해서 Domain Model에 담는다.
+        - Domain Model 별 특화된 메서드를 사용해서 수행한다.
+            - 예를들어, Order order = orderRepo.findById(orderId); 후에, order.cancel() 같은 방식으로 처리.
+        - Service에서는 해당 코드들을 순서만 보장한다. 즉, transaction / domain 간 순서만 보장한다.
+
