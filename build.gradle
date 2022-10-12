@@ -74,6 +74,11 @@ dependencies {
     메모리에서 실행되기 떄문에, App 재시작마다 초기화된다. -> 이를 이용하여 test용도로 많이 사용된다.
     여기서는 JPA의 테스트, 로컬 환경에서의 구동에 사용할 예정./
     implementation('com.h2database:h2')
+
+    /mustache 의존성 추가/
+    implementation('org.springframework.boot:spring-boot-starter-mustache')
+    /보다시피 spring에서 공식지원하는 템플릿엔진이다. 의존성하나만 추가하면 다른 starter-package와 마찬가지로 추가설정 없이 설치 완료./
+    /부트 버전 또한 신경쓰지 않아도 된다./
 }
 
 test {
