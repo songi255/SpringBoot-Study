@@ -2,3 +2,9 @@
 /.gradle/
 .gradle
 .idea
+# 구글서비스 인증정보는 중요한 보안으로, 유출되어서는 안된다.
+application-oauth.properties
+# 여기 추가했는데도 여전히 커밋목록에 나온다면, Git 캐시문제 때문이다.
+# git rm -r --cached .
+# git add .
+# git commit -m "fixed untracked files"
