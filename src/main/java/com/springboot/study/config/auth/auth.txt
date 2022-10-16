@@ -1,3 +1,4 @@
+
 Spring Security는 막강한 Authentication (인증)과 Authorization (인가) 기능을 가진 프레임 워크이다.
 인터셉트, 필터 기반의 보안기능을 구현하는 것 보다, Spring Security를 통해 구현하는 것을 적극적으로 권장하고 있다.
 Spring의 대부분 프로젝트들(Mvc, Data, Batch)처럼 확장성을 고려한 프레임워크다보니, 다양한 요구사항을 손쉽게 추가하고 변경할 수 있다.
@@ -41,6 +42,42 @@ Spring OAuth2
             - 만들어진 클라이언트 정보를 클릭하면 ID와 시크릿코드를 볼 수 있다.
     - application-oauth 등록
         - application-oauth.properties에 등록한다.
+        - spring 에 의해 oauth profile이 생성된다. 이를 기본설정파일인 application.properties에 추가한다.
+        - 그 외에 User 관련 만들고, 이제 build.gradle에 시큐리티 의존성 추가한다.
 
+이제 네이버도 추가해보자.
+    - https://developers.naver.com/apps/#/register?api=nvlogin 로 이동해서 항목들을 채운다.
+        - 회원이름, 이메일, 프로필 사진 을 '필수'로 체크
+        - 추가정보는 필요한 경우 선택
+    - API 로그인 환경 -> PC 웹 선택
+        - 서비스 URL : http://localhost:8080/ -> 필수값이다.
+        - callback URL : http://localhost:8080/login/oauth2/code/naver -> 일단 이렇게 등록한다.
+    - ID와 Secret을 application-oauth.properties에 등록한다.
+        - Naver에서는 Spring Security를 공식지원하지 않기 때문에 그동한 CommonOAuth2Provider에서 해주던 값들을 모두 수동으로 입력해야 한다.
 
-
+마지막으로 기존 test에 시큐리티 적용으로 문제가 되는 부분들을 해결해보자..
+    - 테스트마다 인증한 사용자가 호출한 것 처럼 작동하도록 수정하겠다.
+    - IntelliJ의 Gradle 탭 -> Tasks -> verification -> test 더블클릭 해서 전체 테스트 수행해보자. 인증문제로 대부분 실패한다.
+    - 문제1 : No qualifying bean of type 'com.springboot.study.config.auth.CustomOAuth2UserService'
+        - 클래스 생성에 필요한 소셜로그인 관련 설정값들이 없기 때문에 발생한다.
+        - application-oauth.properties 에 있잖아! 라고 할 수 있는데, src/main 환경과 src/test 환경이 달라서 그렇다.
+            - 둘은 본인만의 환경구성을 가진다. 다만 application.properties 는 적용됬던 이유는, 이건 test에 없으면 가져오도록 되어있어서 그렇다. 딱 이 파일까지만..
+            - 이 문제를 해결하기 위해 test에도 test환경을 위한 application.properties를 만들어주겠다.
+                - 실제 구글연동까지 할 것은 아니기 때문에, 가짜 설정값을 등록한다.
+    - 문제2 : status에 302가 return 됨
+        - spring security에서 인증되지 않은 사용자의 요청은 이동시키기 때문이다.
+        - 임의로 인증된 사용자를 추가해서 API만 테스트해 볼 수 있게 하겠다.
+            - Spring에서 공식적으로 방법을 지원하고 있고, 어렵지 않다.
+            - 우선, spring security test를 위한 여러 도구를 지원하는 spring-security-test를 build.gradle에 추가한다.
+            - 이후, test Code에서 MockMvc를 통해 test하면 된다.
+    - 문제3 : No qualifying bean of type 'com.springboot.study.config.auth.CustomOAuth2UserService' 또 뜨는데, @WebMvcTest에서 이걸 찾을 수 없다는 뜻이다.
+        - @WebMvcTest는 CustomOAuth2UserService를 스캔하지 않기 때문에 발생한다.
+            - WebSecurityConfigurerAdapter, WebMvcConfigurer를 비롯한 @ControllerAdvice, @Controller를 읽는다.
+            - 즉, @Repository, @Service, @Component는 스캔대상이 아니다.
+            - 그래서 SecurityConfig는 읽었지만, 그 생성을 위해 필요한 CustomOAuth2UserService는 읽을수가 없는 것이다.
+            - 해결법은 일단 SecuriyConfig를 스캔대상에서 제거한 후, MockUser를 생성한다. -> 자세한건 HelloControllerTest에 적겠다.
+            - 이래도 문제가 발생한다. @EnableJpaAuditing 때문이다.
+                - 이걸 사용하기 위해선 최소 하나의 @Entity 클래스가 필요한데, @WebMvcTest이다 보니 당연히 없다.
+                - @EnableJpaAuditing 가 @SpringBootApplication 과 함께 있다보니 @WebMvcTest 에서도 스캔하게 된 것이다.
+                - 둘을 분리해버리자. Application.java에서 @EnableJpaAuditing를 제거하고 config 패키지에 JPAConfig를 만들어 @EnableJpaAuditing를 추가한다.
+                - 이제야 제대로 돌아가는 것을 볼 수 있다.

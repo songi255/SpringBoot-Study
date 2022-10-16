@@ -57,6 +57,13 @@ dependencies {
     /테스트가 안됬던 이유.. settings - Build, Execution, Deployment - Gradle - Run tests using : IntelliJ 로,
      IntelliJ가 test를 실행하게끔 변경해주어야했다./
 
+    /Gradle test를 가능케 하기 위해 의존성을 추가해보자/
+    testImplementation("org.junit.vintage:junit-vintage-engine") {
+        exclude group: "org.hamcrest", module: "hamcrest-core"
+    }
+    /Gradle test를 위해서는 Lombok도 필요하다. 아래에서 추가했으니 생략하겠다./
+    /잘되네~/
+
     /Lombok의 추가/
     /implementation('org.projectlombok:lombok');/
     /이후, lombok plugin까지 설치한다./
@@ -79,6 +86,17 @@ dependencies {
     implementation('org.springframework.boot:spring-boot-starter-mustache')
     /보다시피 spring에서 공식지원하는 템플릿엔진이다. 의존성하나만 추가하면 다른 starter-package와 마찬가지로 추가설정 없이 설치 완료./
     /부트 버전 또한 신경쓰지 않아도 된다./
+
+    /Spring Security (OAuth2) 의존성 추가/
+    implementation('org.springframework.boot:spring-boot-starter-oauth2-client')
+    // 소셜 로그인 등.. Client 입장에서 소셜기능 구현 시 필요한 의존성.
+    // spring-security-oauth2-client 와 spring-security-oauth2-jose 를 기본으로 관리해준다.
+
+    /세션용 DB 사용/
+    implementation('org.springframework.session:spring-session-jdbc')
+
+    /spring security test 도구들/
+    testImplementation("org.springframework.security:spring-security-test:")
 }
 
 test {

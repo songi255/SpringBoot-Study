@@ -6,6 +6,22 @@
         <div class="row">
             <div class="col-md-6">
                 <a href="/posts/save" role="button" class="btn btn-primary">글 등록</a>
+                {{#userName}} <!-- mustache는 if가 없다.true/false만 판단한다. 그래서 항상 최종값을 넘겨받아야 한다. 여기서는 값이 있으면 노출시키도록 구성했다. -->
+                    Logged in as: <span id="user">{{userName}}</span>
+                    <!-- /logout 은 Spring Security에서 기본제공하는 로그아웃 URL이다. 즉 별도로 Controller 만들 필요가 없다. SecurityConfig 클래스에서 변경은 가능하다 -->
+                    <a href="/logout" class="btn btn-info active" role="button">Logout</a>
+                {{/userName}}
+
+                {{^userName}} <!-- 해당 값이 존재하지 않는경우 보여준다는 뜻 -->
+                    <!-- 아래 URL 역시 Spring Security 에서 기본적으로 제공하는 로그인 URL 이다. -->
+                    <!-- google 로그인 -->
+                    <a href="/oauth2/authorization/google" class="btn btn-success active" role="button">Google Login</a>
+                    <!-- naver 로그인 -->
+                    <!-- naver 로그인 URL는 application-oauth.properties의 redirect-uri 값에 맞춰 자동등록된다. -->
+                    <!-- /oauth2/authorization/ 까지는 고정익, 마지막 Path만 각 소셜 로그인 코드를 사용하면 된다.(여기서는 naver) -->
+                    <a href="/oauth2/authorization/naver" class="btn btn-secondary active" role="button">Naver Login</a>
+                {{/userName}}
+
             </div>
         </div>
         <br>

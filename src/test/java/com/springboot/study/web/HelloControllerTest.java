@@ -1,9 +1,13 @@
 package com.springboot.study.web;
 
+import com.springboot.study.config.auth.SecurityConfig;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 //import org.springframework.test.web.servlet.ResultActions;
@@ -16,7 +20,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @RunWith(SpringRunner.class) // test 진행 시 JUnit 내장 실행자 외에 다른 실행자 실행. 즉, SpringBootTest와 JUnit 사이의 연결자 역할
-@WebMvcTest(controllers = HelloController.class) // 여러 SpringTestAnnotation 중 WemMVC에 집중할 수 있는 어노테이션
+@WebMvcTest(controllers = HelloController.class, // 여러 SpringTestAnnotation 중 WemMVC에 집중할 수 있는 어노테이션
+    excludeFilters = {
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = SecurityConfig.class) // 문제가 생기는 SecurityConfig를 일단 스캔에서 제외했다.
+    }
+)
 // 선언할 경우, @Controller, @ControllerAdvice 등을 사용 가능
 // 단, @Service, @Component, @Repository 등은 사용 불가능
 // 이 예제에서는 Controller만 사용하기 때문에 선언한다.
@@ -28,6 +36,7 @@ public class HelloControllerTest { // 일반적으로 TestClass는 대상 클래
     // 이 MockMvc 클래스를 통해 HTTP GET/POST 등 API 테스트 가능
 
     @Test
+    @WithMockUser(roles = "USER") // 여기서도 가짜 사용자를 생성한다.
     public void should_return_hello() throws Exception{ // 다 작성했다면, 이 메서드 옆의 화살표를 눌러서 실행해보자.
         String hello = "hello";
 
@@ -46,6 +55,7 @@ public class HelloControllerTest { // 일반적으로 TestClass는 대상 클래
 
     // 두번째, Dto 테스트~ JSON 응답을 test 해본다.
     @Test
+    @WithMockUser(roles = "USER")
     public void should_return_dto() throws Exception{
         String name = "hello";
         int amount = 1000;
