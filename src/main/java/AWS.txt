@@ -1,0 +1,121 @@
+24시간 서버에는 3가지 선택지가 있다.
+    1. 집에서 PC를 24시간 구동
+    2. hosting service(Cafe24, 코리아호스팅) 을 이용한다.
+    3. 클라우드 서비스 (AWS, AZURE, GCP)를 이용한다.
+일반적으로 비용은 1, 2가 더 저렴하다. 다만 트래픽이 몰린다거나 할 시에는 유동적인 3이 훨씬 유리하다.
+
+클라우드는 단순히 물리장비를 대여하는 것이 아니다.
+    - 예를 들어 EC2는 서버장비를 대여하지만 추가로
+        - 로그관리
+        - 모니터링
+        - HW 교체
+        - 네트워크 관리
+        등등을 기본적으로 지원한다. 개발자가 직접 해야 할 일을 AWS가 전부 지원하는 것이다.
+이런 클라우드는 몇가지 형태가 존재한다.
+    1. IaaS (Infrastructure as a Service)
+        - 기존물리장비 + 미들웨어 형태의 추상화서비스
+        - 가상머신, 스토리지, 네트워크, OS 등 IT 인프라 대여
+        - AWS의 EC2, S3 등
+    2. Paas (Platform as a Service)
+        - IaaS에서 한번 더 추상화 -> 많은기능 자동화됨을 의미
+        - AWS의 Beanstalk, Heroku 등
+    3. SaaS (Software as a Service)
+        - SW 서비스 의미
+        - Google Drive, Dropbox, 와탭 등
+
+여기서는 AWS를 선택했는데 이유는 아래와 같다.
+    1. 1년간 프리티어 제공 (서비스마다 제한있음)
+    2. 기본적으로 지원하는 기능(모니터링, 로그관리, 백업, 복구, 클러스터링 등등)이 많아, 개인 또는 소규모개발 시 좀 더 집중가능
+    3. 많은 기업이 AWS로 이전 중 -> 사용자가 많아 커뮤니티 활성화
+    IaaS 를 사용할 것인데, PaaS인 Beanstalk를 사용하면 대부분 작업이 간소화되긴 하지만 프리티어로 무중단배포는 불가능하다 (2대쓰면 가능하다)
+
+일단 AWS 가입, 로그인
+EC2 인스턴스 생성
+    - EC2 : Elastic Compute Cloud. C가 2개라서 C2이다.
+    - 성능, 용량 등을 유동적으로 사용할 수 있다.
+    - 프리티어에는 제한이있다.
+        - t2.micro 사양만 가능하다.
+            - vCPU 1 Core, Memory 1GB
+            - 보통 vCPU는 CPU의 절반정도 성능을 가진다.
+        - 월 750 시간 제한
+            - 24시간 틀어놓으면 744 시간으로, 1대의 t2.micro 면 24시간 사용가능함을 의미한다.
+    - 여기서는 Amazon Linux AMI 1 로 진행한다. 이유는 아래와 같다.
+        - 아직 국내자료가 리눅스 1이 더 많다. -> 2년 지났으니 걍 2 쓰자
+        - Centos 6 버전 자료들은 대부분 Amazon linux 1 에서 사용할 수 잇따.
+        - Amazon 2는 Centos 7 버전을 그대로 사용할 수 있다.
+        - 그럼 걍 Centos 사용하지 왜 Amazon 사용하나?
+            - 아마존이 개발하고 있어서 지원받기가 쉽다.
+            - 레드햇 베이스이므로, 레드햇계열 다뤄본 사람일수록 문제없이 사용가능하다.
+            - 각종 AWS 서비스와 상성이 좋다.
+            - Amazon 독자적인 repository를 사용하고 있어 yum이 매우 빠르다.
+            - AWS를 사용하는데 굳이 적극지원하는 OS를 선택하지 않을 이유가 없다는 것이다.
+    - 사양은 t2.micro 프리티어로 간다.
+        - t2는 요금타입을 의미한다.
+             - t3 도 있으며 보통 t 시리즈라고 한다. 범용시리즈로도 불린다. 그만큼 다양한 사양을 사용할 수 있다.
+             - 다른서비스와 달리 credit 이라는 CPU 사용을 위한 포인트가 있다.
+             - 인스턴스 크기에 따라 정해진 비율로 credit을 계속 받게되고, 사용하지 않을 때는 credit을 축적, 사용할때는 소모한다. -> 유동적
+             - credit을 전부 소진하면 더이상 EC2를 사용할 수 없다.
+                - 그래서 트래픽이 높은 서비스들은 T 시리즈 말고 다른 시리즈를 사용하기도 한다.
+                - 다만 그 전까지는 활용도가 높기 때문에, 시작단계에서는 좋은 선택이다.
+        - micro는 사양을 의미한다.
+    - 세부정보
+        - 기업에서 사용할 경우, VPC, Subnet 등을 세세하게 다루지만, 혼자서 1대의 서버만 사용하니 별다른 설정없이 넘어간다.
+    - Storage도 설정해준다. 프리티어는 30Gb 가 최대이므로 최대로 설정해준다.
+    - 태그 추가 -> 이건 사라진 듯?
+    - 보안그룹 설정
+        - 인바운드 규칙 편집
+            - SSH 22번. 0.0.0.0 전체오픈하는 경우, pem 키가 털리면 해킹당한다. 실제 운영에서는 내 IP로만 접속하게 하자.
+                - 이후 카페 같이 다른 위치에서 접속하는 경우, 대시보드에서 해당장소의 IP를 또 추가해주는 방식으로 가자는 것이다..
+            - TCP로 8080. 0.0.0.0로 전체 열어두자. 이건 위험한 일이 아니다.
+    - 참고로 pem 키는 공유가능하니, 그룹으로 만드는 것도 고려해보자.
+    - 탄력적 IP 생성 및 바인딩
+
+이제 EC2 에 접속해보자. MobaXterm을 쓰면 되지만, 혹시 쓸일 있나 싶어 남긴다. username은 ec2-user 인 듯 하다.
+    - Linux & Mac
+        - 원래 "ssh -i pem 키위치 탄력적IP주소" 로 접근해야 한다. 귀찮으니 아래처럼 설정한다.
+        - 1. pem을 ~/.ssh/로 복사 -> ssh 실행 시 pem파일을 자동으로 읽는다.
+            - cp pem 키워치 ~/.ssh/
+        - 2. pem 권한 변경
+            - chmod 600 ~/.ssh/키이름
+        - 3. config 생성
+            - vim ~/.ssh/config
+            - Host 원하는 이름 -> 예를들어, abc로 설정하면 ssh abc로 EC2 접속가능하다.
+                - HostName 탄력적IP 주소
+                - User ec2-user
+                - IdentityFile ~/.ssh/pem파일이름
+            - 권한변경 : chmod 700 ~/.ssh/config
+        - 4. 접속테스트 : ssh 등록한Host
+    - window : putty 사용인데, 필요하다면 250페이지 참고하자. 난 MobaXterm 쓸래.
+
+아마존 리눅스 서버 생성 시 꼭 해야 할 설정들
+    - Java 설치
+        - 기본 java version 확인 후 설치 고려.
+        - sudo yum install -y java-1.8.0-openjdk-devel.x86_64
+        - sudo /usr/sbin/alternatives --config java
+            - 인스턴스의 java version을 변경하는 것이다.
+        - 미사용 java는 삭제한다.
+            - sudo yum remove java-1.7.0-openjdk
+        - 11 + openjdk 변경점반영
+            - sudo yum install java-11-amazon-corretto-headless
+                - headless는 GUI 같은 쓸데 없는 거 빼고 서버용으로만 구성한 것. 전체설치하고싶으면 headless 빼면 된다.
+    - Timezone 변경
+        - sudo rm /etc/localtime
+        - sudo ln -s /usr/share/zoneinfo/Asia/Seoul /etc/localtime
+        - date 명령어로 KST 변경되었는지 확인
+    - HostName 변경
+        - 현재 접속한 서버의 별명을 등록한다.
+        - 실무에서는 수십대의 서버가 작동하므로, 필수등록해야한다.
+        - sudo vim /etc/sysconfig/network
+        - HOSTNAME=~~ 로 삽입하면 된다. 본인이 원하는 서비스명으로 변경한다. (springboot-study)
+            -> Amazon Linux2 부터는 이거 하면 작동안한다.
+                - sudo hostnamectl set-hostname webserver.localdomain 라고 명령어가 있다.
+                - 공용 DNS가 있는 경우 또 다르다고 하니 change localhostname으로 검색해서 사용하자.
+        - sudo reboot
+        - 이제 호스트 주소를 찾을 때, 가장 먼저 검색해보는 /etc/hosts에 변경한 hostname을 등록한다.
+            - 여기 등록되지 않아 발생한 장애가 있는데, 걍 그렇다. 장애까지 발생할 수 있다는 말.
+            - sudo vim /etc/hosts
+                - 127.0.0.1 등록한HostName <- 이렇게 등록
+            - curl 등록한호스트이름 <- 이걸로 확인가능.
+                - 등록 잘못했다면 찾을 수 없는 주소라고 나옴
+                - 제대로 됬다면 80포트로 접근이 안된다는 에러가 나옴
+                    - 아직 80포트 서비스가 없음을 의미.

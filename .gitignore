@@ -9,3 +9,4 @@ application-oauth.properties
 # git add .
 # git commit -m "fixed untracked files"
 # 안되는디???
+# 처음에 추가를 해버렸기 때문에 문제가 생긴다. 파일 자체를 삭제했다가 다시만드는 것도 좋은 방법이다.
