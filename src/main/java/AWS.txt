@@ -108,7 +108,7 @@ EC2 인스턴스 생성
         - sudo vim /etc/sysconfig/network
         - HOSTNAME=~~ 로 삽입하면 된다. 본인이 원하는 서비스명으로 변경한다. (springboot-study)
             -> Amazon Linux2 부터는 이거 하면 작동안한다.
-                - sudo hostnamectl set-hostname webserver.localdomain 라고 명령어가 있다.
+                - sudo hostnamectl set-hostname 원하는이름.localdomain 라고 명령어가 있다.
                 - 공용 DNS가 있는 경우 또 다르다고 하니 change localhostname으로 검색해서 사용하자.
         - sudo reboot
         - 이제 호스트 주소를 찾을 때, 가장 먼저 검색해보는 /etc/hosts에 변경한 hostname을 등록한다.
@@ -119,3 +119,48 @@ EC2 인스턴스 생성
                 - 등록 잘못했다면 찾을 수 없는 주소라고 나옴
                 - 제대로 됬다면 80포트로 접근이 안된다는 에러가 나옴
                     - 아직 80포트 서비스가 없음을 의미.
+
+보안그룹설정
+    - EC2에 사용된 보안그룹 ID와 본인 IP를 RDS 보안그룹에 인바운드로 추가
+        - 유형을 MySQL/Aurora로 설정하면 자동 3306으로 추가된다
+        - 이로써 EC2와 RDS 간 접근이 가능하다.
+        - EC2는 이후 2대 3대가 될 수도 있고, 매번 IP 등록할 수 없으니 보편적으로 이렇게 보안그룹 간 연동을 한다.
+    - 이제 접속 테스트를 해보자
+        - 본인이 원하는 GUI 툴로 접속하면 된다. 여기서는 IntelliJ Plugin으로 진행해보겠다. (Database Navigator)
+        - 아니 그냥 난 유료버전이니 인텔리제이 기능 사용하겠다.
+        - View -> Tool Windows -> Database -> + -> Data Source -> 본인 DB 선택
+            - RDS 정보페이지에서 엔드포인트 확인, 복사 -> Host에 붙여넣기
+            - database는 비워되도 되는 듯
+            - user과 pass는 RDS 설정대로.
+            - Test Connection 후 Apply - OK
+            - query console을 열어보자.
+                - use awsDB이름
+                - schema에 뜨는지 확인.. 하고 싶은데 모르겠다.
+                - character_set, collation 확인해보자
+                    - show variables like 'c%'
+                        - character_set_database랑 collation_connection 2개가 latin1이 적용 되있는 걸 볼 수 있다.
+                            - 얘들만 MariaDB에서만 RDS 파라미터그룹으로 변경못한다.
+                        - 바꿔주자.
+                            - alter database db명 character set = 'utf8mb4' collate = 'utf8mb4_general_ci'
+                            - 다시 확인해보자. 잘 적용된 것을 확인할 수 있다.
+                        - timezone도 확인해보자. select @@time_zone, now();
+                        - 마지막으로 한글명 잘 들어가는 지 간단하게 쿼리쳐보자
+                            - 테이블 생성은 인코딩 설정 변경전에는 불가능하다. 만들어질 당시의 설정을 그대로 유지한다.
+                            - 그래서 테이블은 웬만하면 모든 설정이 끝난 후 생성하자.
+                            - create table test(
+                                id bigint(20) NOT NULL AUTO_INCREMENT,
+                                content varchar(255) DEFAULT NULL,
+                                PRIMARY KEY(id)
+                            ) ENGINE=InnoDB;
+                            - insert into test(content) values ('테스트');
+                            - select * from test;
+                            - 한글도 잘 들어가는 것을 확인할 수 있다. 이제 모든 설정이 끝났다!
+
+이제 EC2와 연동이 잘 되는지 확인해보자.
+    - EC2에 ssh로 접속해보자.
+    - mysql 설치 - sudo yum install mysql
+    - RDS mysql 접속 - mysql -u 계정 -p -h Host주소
+        - Host 주소는 Data source properties에서 확인할 수 있다. RDS에서 직접 봐도 되고..
+        - mariaDB인데도 mysql로 접속이되네 ㅋㅋ
+        - show databases 로 RDS 맞는 지 확인해보자. -> 접근까지 완전히 완료되었다!!
+
