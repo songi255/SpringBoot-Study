@@ -1,0 +1,72 @@
+language: java
+jdk:
+  - openjdk11
+
+# Travis CI를 어느 브랜치가 푸시될 때 수행할 지 지정
+branches:
+  only:
+    - master
+
+# Travis CI 서버의 Home
+# Gradle을 통해 의존성을 받게되면 이를 해당 디렉토리에 캐시하여, 같은 의존성은 다음 배포때부터 다시 받지않도록 설정
+cache:
+  directories:
+    - '$HOME/.m2/repository'
+    - '$HOME/.gradle'
+
+# 수행되는 명령어
+script: "./gradlew clean build"
+
+# CI 완료 시 메일로 알람
+notifications:
+  email:
+    recipients:
+      - assert2914@gmail.com
+
+# deploy 전 수행. CodeDeploy가 Jar를 인식못해서, (Jar + 기타설정파일).zip 한다.
+# before_deploy:
+#   - zip -r springboot-study
+#   - mkdir -p deploy
+#   - mv springboot-study.zip deploy/springboot-study.zip
+# 위 코드는 프로젝트의 모든 파일을 zip 하는데, 여기서 필요없는 파일은 빼버리겠다.
+before_deploy:
+  - mkdir -p before-deploy # zip에 포함시킬 파일들을 담을 디렉토리
+  - cp scripts/*.sh before-deploy/
+  - cp appspec.yml before-deploy/
+  - cp build/libs/*.jar before-deploy/
+  - cd before-deploy/ && zip -r before-deploy
+  - cd ../ && mkdir -p deploy
+  - mv before-deploy/before-deploy.zip deploy/springboot-study.zip
+# Travis CI는 디렉토리 단위로만 업로드 가능하기에, before-deploy폴더를 항상 생성해서 작업한다.
+
+# 배포행위를 선언한다.
+deploy:
+  # 접근 정보는 Travis 사이트에서 환경변수로 설정했었다!
+  - provider: s3
+    access_key_id: $AWS_ACCESS_KEY
+    secret_access_key: $AWS_SECRET_KEY
+
+    bucket: springboot-study-buildtest # s3 bucket name
+    region: ap-northeast-2
+    skip_cleanup: true
+    acl: private # zip 파일 접근을 private로 설정
+    local_dir: deploy # before_deploy에서 생성한 디렉토리이다.
+    # 해당 위치의 파일들만 S3로 전송하겠다는 뜻이다.
+    wait-until-deployed: true # deprecate 됬는지 자동완성에 안뜬다...
+
+  - provider: codedeploy
+    access_key_id: $AWS_ACCESS_KEY
+    secret_access_key: $AWS_SECRET_KEY
+
+    bucket: springboot-study-buildtest # s3 bucket name
+    key: springboot-study.zip # 빌드파일 압축해서 전달
+    bundle_type: zip
+    application: springboot-study # 웹콘솔에서 등록한 CodeDeploy 애플리케이션
+
+    deployment_group: springboot-study-group # 웹 콘솔에서 등록한 CodeDeploy 배포그룹
+
+    region: ap-northeast-2
+    wait-until-deployed: true # deprecate 됬는지 자동완성에 안뜬다...
+
+
+

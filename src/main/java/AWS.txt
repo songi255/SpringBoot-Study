@@ -164,3 +164,303 @@ EC2 인스턴스 생성
         - mariaDB인데도 mysql로 접속이되네 ㅋㅋ
         - show databases 로 RDS 맞는 지 확인해보자. -> 접근까지 완전히 완료되었다!!
 
+이제 EC2 서버에 배포를 해보자.
+    - EC2에 git 설치
+        - sudo yum install git
+        - git --version
+    - mkdir ~/app && mkdir ~/app/step1
+    - cd ~/app/step1
+    - git clone 주소~~
+    - ls로 복사 잘 되었는지 확인
+    - 코드 수행 테스트 : ./gradlew test
+        - test가 실패해서 변경이 필요하다면 변경 후 git pull 해주면 된다.
+        - 실행권한이 없다고 뜨면 chmod +x ./gradlew
+        - 참고로, 현재 EC2에는 gradle이 없지만 프로젝트 내부에 gradlew가 있기 때문에 실행가능.
+            - gradle이 없는 환경이나 버전이 다른 상황에서도 해당 프로젝트에 한해 사용할 수 있게 해주는 wrapper 파일이다.
+    - 배포스크립트 생성
+        - 앞선 과정을 정리해보면, git pull - gradle test & build - 해당 프로젝트 실행 이다. 쉘 스크립트로 묶어버리자.
+        - vi ~/app/step1/deploy.sh
+        - 관련 스크립트는 일단 이 프로젝트에 담겠다
+        - 실행권한 추가 : chmod +x ./deploy.sh
+        - 실행 ./deploy.sh
+        - 잘 실행되는지 로그를 확인하자.
+            - vi nohup.out
+                - 실행되는 App에서 출력되는 모든 내용을 갖고 있다.
+                - 제일 아래로 가면 ClientRegistrationRepository를 찾을 수 없다고 뜬다. 왜?
+                    - 인증정보가 없으니까! application-oauth.properties는 git에 올리면 안되니, 직접 올리도록 한다.
+                    - 아마.. private storage를 사용하면 올려도 될듯.. 하지만 Travis CI의 경우 private 면 유료이다.
+                    - ~/app 에 application-oauth.properties 를 올린다.
+                    - deploy.sh를 해당 설정파일 사용하도록 수정한다.
+        - 이제 RDS 접근설정도 추가해보자.
+            - MariaDB에서 SpringBoot 프로젝트를 실행하기 위해서는 몇가지 작업이 필요하다
+                - 테이블 생성
+                    - H2에서 자동생성해주던 테이블들을 MariaDB에선 직접 쿼리로 생성한다.
+                    - 1. JPA가 사용될 엔티티테이블 생성
+                        - test code 수행시 나오는 쿼리 사용하면 된다.
+                        - nohup.out 을 참고했다.
+                            - create table posts (id bigint not null auto_increment, created_date datetime, modified_date datetime, author varchar(255), content TEXT not null, title varchar(500) not null, primary key (id)) engine=InnoDB
+                            - create table user (id bigint not null auto_increment, created_date datetime, modified_date datetime, email varchar(255) not null, name varchar(255) not null, picture varchar(255), role varchar(255) not null, primary key (id)) engine=InnoDB
+                    - 2. 스프링 세션이 사용될 테이블 생성
+                        - schema-mysql.sql 파일에서 확인할 수 있다.
+                            - File 검색 (Ctrl + Shift + N 으로 인텔리제이에서 검색해보자.)
+                - 프로젝트 설정
+                    - 프로젝트와 연동을 위한 DB 드라이버를 추가한다.
+                    - 먼저 MariaDB 드라이버를 build.gradle에 추가한다.
+                    - 이제 서버구동환경을 하나 구성한다.
+                        - src/main/resource/ 에 application-real.properties 생성
+                            - 앞에 말했듯이, profile=real인 환경을 구성하게 된다.
+                            - 실제 운영될 환경이므로, 보안/로그상 이슈가 될 만한 설정들을 모두 제거하며, RDS환경 profile이 추가된다.
+                - EC2 설정
+                    - DB 접속정보는 중요하게 보호해야 한다. 공개되면 외부에서 데이터를 모두 가져갈 수 있으니..
+                    - 프로젝트 안에 접속정보를 가지고 있으면 github 같은데서는 누구나 해킹할 위험이 있다.
+                    - EC2 서버 내부에서 접속정보 관리하자.
+                    - OAuth와 마찬가지로, RDS 접속정보도 보호해야 할 정보니 EC2 서버에 직접 설정파일을 둔다.
+                    - vim ~/app/application-real-db.properties
+                    - 마지막으로 deploy.sh가 real profile을 쓸 수 있도록 개선한다.
+                - 이제 deploy.sh를 실행해보자. nohup.out에 Tomcat started on ~~~ 가 뜨면 성공이다!
+                - curl localhost:8080 해보자. html코드가 정상적으로 보이면 성공이다!
+    - 마지막으로 실제 브라우저에서 로그인 시도해보자.
+        - 그 전에 몇가지 작업을 수행해보자.
+            - EC2 보안그룹에 8080포트가 열려있는지 확인하자.
+            - 로그인 서비스에 EC2의 도메인을 등록하지 않았다. 등록해주자.
+                - 먼저 구글. API 및 서비스 -> 사용자 인증 정보
+                - OAuth 동의화면 - 승인된 도메인에 http없이 EC2의 IP등록
+                - 사용자 인증정보 - 본인의 서비스 클릭 - 퍼블릭 DNS 주소 + :8080/login/oauth2/code/google를 승인된 리티렉션 URI에 등록
+                - 이렇게 하면 완료다! 이제 네이버를 해보자.
+                - 본인 프로젝트로 이동 - API 설정 - PC웹 - 서비스 URL, Callback URL을 수정한다.
+                    - 서비스 URL은 퍼블릭 DNS 주소
+                        - 로그인 시도하는 서비스가 네이버에 등록된 서비스인지 판단하기 위한 항목
+                        - 8080포트는 제외하고 실제 도메인주소만 입력
+                        - 네이버에서 아직 지원되지 않아 하나만 등록가능 (localhost는 뺴야 함) -> 개발단계에서는 등록하지 않는것을 추천
+                        - localhost도 테스트하고싶다면 서비스를 하나 더 생성하라.
+                    - Callback은 전체주소. 즉, 퍼블릭DNS + :8080/login/oauth2/code/naver
+                - 네이버도 잘 동작하는 것을 볼 수 있다.
+
+하지만 여전히 수동 Test & Build를 한다. Travis CI 로 git에 올리기만 하면 배포를 자동화해보자!
+우선 CI/CD가 무엇일까?
+    - CI : Continuous Integration
+        - VCS 시스템에 push 시 자동으로 test & build 하여 안정적인 배포파일을 만드는 과정이다.
+    - CD : Continuous Deployment
+        - 위 CI의 빌드결과를 자동으로 무중단배포까지 진행하는 것
+    - 이게 없었을 때는 배포전문팀도 따로 있기도 했고, 매주 Merge만 하는 병합일이 따로 존재하기까지 했다.
+        - 수작업으로 인해 생산성이 좋을 수가 없었으며, 수십 수백대의 서버에 배포하거나, 긴박하게 당장 배포를 해야한다면 더는 수동으로는 불가능했다.
+
+단순히 CI도구를 도입헀다고 CI를 하고있는 것은 아니다.
+    - 마틴 파울러의 블로그 (http://bit.ly/2YvOvFp) 참고해보면, CI에 대해 다음과 같은 4가지 규칙을 제시한다.
+        1. 모든 소스코드가 살아있고 (현재 실행되고), 누구든 소스에 접근할 수 있는 단일지점을 유지하라
+        2. 빌드 프로세스를 자동화해서, 누구든 시스템빌드하는 단일명령어를 사용할 수 있게 하라
+        3. 테스팅을 자동화해서, 단일명령어로 언제든지 시스템에대한 건전한 테스트수트를 실행할 수 있게 하라
+        4. 누구나 현재 실행파일을 얻으면 지금까지 가장 완전한 실행파일을 얻었다는 확신을 하게 하라
+    - 여기서 특히나 중요한 것은 테스팅 자동화이다.
+        - 지속적 통합을 위해서는 완전한 상태임을 보장하기 위해야 하는 것이다.
+            - TDD를 더 알고싶다면 명품강의로 유명한 백명석님의 클린코더스 - TDD편을 보길 추천한다. (http://bit.ly/2xtKinX)
+
+Travis CI 연동하기
+    - 무료 CI 서비스... 였다. 지금은 첫 한달 무료이다. github연동을 제공한다. 그래서 정리만 해두고 지금은 걍 안해야겠다.
+        - Jenkins 같은 도구도 있지만, 설치형이기 때문에 이를 위한 EC2 인스턴스가 하나 더 필요하다.
+            - AWS에서 CI같은 도구로 CodeBuild를 제공한다. 하지만 빌드시간만큼 요금이 부과되는 구조라 초기에는 부담스럽다.
+                - 실제 서비스되는 EC2, RDS, S3외에는 비용부분을 최소화하는 것이 좋다.
+            - 지금은 시작단계이므로 부담스럽지 않게 Travis CI로 시작한다.
+            - 걍 젠킨스 쓰고싶네.. 오픈소스라서 무료에다가, 간단한 개인용이면 걍 라즈베리파이 하나 사서 돌리는것도 나쁘지 않을 듯.
+    - https://travis-ci.org/ 에 github 계정으로 로그인 후 settings - 본인 프로젝트 선택, 상태바 활성화. 이걸로 사이트 설정은 끝이다.
+    - CI 설정은 프로젝트 내 존재하는 .travis.yml 파일로 한다.
+        - YAML (야믈) 확장자라고하며, 쉽게말하면 JSON에서 괄호를 제거한 것이다.
+        - 이념이 "기계가 파싱하기 쉽게, 사람이 다루기 쉽게" 이다. 그러다보니 처음부터 읽고 쓰기 쉽다. 현재 많은 프로젝트와 서비스들이 적극사용중이다.
+        - 우선, build.gradle 과 같은 위치에 .travis.yml을 생성한다.
+        - 이제 다시 master 에 커밋 및 푸시 해보자. travis 사이트에서 히스토리를 확인할 수도 있고, 이메일도 확인할 수 있다.
+
+S3 연동
+    - AWS에서 제공하는 일종의 파일서버이다. 보통 이미지 업로드를 구현한다면 S3를 이용하는 경우가 많다.
+    - 배포파일들을 관리하는 등의 기능도 지원하기 때문에, S3를 사용한다.
+    - S3까지 연동하게 되면 전체 구조는 다음과 같다.
+        - Github 푸시
+            - Travis CI에서 빌드
+                - AWS S3에 jar 전달
+                - AWS CodeDeploy 서비스에 배포요청
+                    - AWS EC2에 배포
+    - 첫번째로, Travis CI와 S3를 연동하겠다. 배포에 앞서 Jar 파일을 CodeDeploy에 전달하기 위해서이다.
+        - CodeDeploy는 저장기능이 없어서, 배포파일을 저장할 공간이 필요한 것이다. 보통 이럴때 S3를 이용한다.
+            - 물론, GitHub 연동이 있어 CodeDeploy로 빌드도, 배포도 할 수 있다.
+            - 하지만 이렇게 할 경우, 빌드없이 배포만 필요할 때 대응하기가 어렵다.
+            - 빌드와 배포가 분리되어있으면, 예전에 빌드된 Jar를 재사용할 수 있지만, 항상 빌드해야한다면 확장성이 많이 떨어진다.
+        - AWS Key 발급
+            - 일반적으로 AWS 서비스에 외부서비스(Travis CI 같은)가 접근할 수 없다. 그래서 Key가 필요하다.
+            - AWS는 이런 인증관련 서비스로 IAM(Identify and Access)를 사용한다.
+            - IAM - 사용자 - 사용자추가 - 프로그래밍방식 엑세스 - 기존정책 직접연결 - s3full, CodeDeployFull 검색 및 체크
+                - 실무에서는 두 권한을 분리관리하기도 하는데, 여기서는 간단하게 둘을 합쳐서 관리하겠다.
+                - 태그는 key : Name으로 하나 지정하는데, 값은 대충 인지가능한 이름으로 지정한다.
+        - 이제 Travis CI에 등록한다. Travis 사이트의 설정으로 이동한다.
+            - Environment Variables에 AWS_ACCESS_KEY, AWS_SECRET_KEY 로 해서 키값을 등록한다.
+            - 이렇게 하면 이제 .travis.yml 에서 $AWS_ACCESS_KEY, $AWS_SECRET_KEY 라는 이름으로 사용할 수 있다.
+    - Key를 이용해서 S3 버킷을 생성해보자.
+        - Simple Storage Service 라서 S3 이다. 일종의 파일서버이다.
+        - 순수하게 파일을 저장, 권한관리, 검색 등을 지원한다.
+        - 보통 게시글 쓸 때 첨부파일 등록 구현 시 많이 사용한다. 여기서는 Travis CI 생성된 Build파일 저장하도록 구성하겠다.
+        - S3 검색 - 버킷만들기 - 이름은 배포 zip 들이 모여있음을 의미하도록 짓는걸 추천 (예 : springboot-study-build)
+            - 모든 퍼블릭 엑세스는 차단해야 함
+                - 실제 서비스 시 Jar이 퍼블릭인 경우 누구나 다 내려받아 코드나 설정값, 주요 키값들이 다 탈취될 수 있다.
+                - 퍼블릭이 아니어도 IAM으로 접근가능하다.
+        - 흠.. 만들어보니 이미 -build는 존재하는 버킷이라고 뜬다... 아마 EC2 만들 때 자동으로 생성되는게 있을수도 있는 듯.
+    - travis.yml 을 Jar를 S3에 올릴 수 있도록 수정
+    - git에 push하면 s3에도 zip 배포파일이 잘 올라온 것을 확인할 수 있다.
+
+이제 CodeDeploy로 배포까지 완료해보자.
+    - 배포대상인 EC2가 CodeDeploy를 연동할 수 있게 IAM역할을 하나 생성하겠다.
+        - IAM - 역할 - 역할만들기 - AWS 서비스 - EC2 - ec2rolefora(wscodedeploy) 검색 및 선택 - 태그는 Name : 원하는 이름
+            - 앞선 사용자와 역할은 무슨차이일까?
+                - 역할 : AWS 서비스에만 할당할 수 있는 권한
+                - 사용자 : AWS 서비스 외 사용할 수 있는 권한 (로컬 PC, IDC 서버 등..)
+    - EC2 - 인스턴스 - 작업 - 보안(보안으로 바꼈네) - IAM 역할 수정 - EC2 재부팅
+    - EC2에서 CodeDeploy 요청을 받을 수 있도록 Agent를 하나 설치하겠다.
+        - EC2 접속 후 aws s3 cp s3://aws-codedeploy-ap-northeast-2/latest/install . --region ap-northeast-2
+        - install file에 권한 추가 : chmod +x ./install
+        - sudo ./install auto
+        - Agent 정상 실행중인지 상태검사 : sudo service codedeploy-agent status
+        - 만약 설치 중 루비가 없다는 에러가 뜨면 sudo yum install ruby 해준다.
+    - CodeDeploy가 EC2 접근하기 위한 권한 설정
+        - IAM 역할 - AWS서비스 - CodeDeploy
+    - 이제 CodeDeploy를 생성해보자.
+        - 앞서, AWS 배포 3형제를 소개한다.
+            - Code Commit
+                - Github 같은 코드저장소 역할을 한다. github에 밀려 거의 사용되지 않는다.
+            - Code Build
+                - Tracis CI 같은 빌드용서비스이다.
+                - 멀티모듈 배포 시 사용해볼 만 하지만, 규모가 있는 서비스는 대부분 Jenkins/Teamcity 등을 이용하니 이것도 거의 사용되지 않는다.
+            - CodeDeploy
+                - AWS의 배포서비스. 이건 대체제가 없다.
+                - auto scaling 그룹배포, blue-green 배포, rolling 배포, EC2 단독배포 등 많은 기능 지원한다.
+        - CodeDeploy - 애플리케이션 생성 - 컴퓨팅플랫폼 : EC2/온프레미스
+        - 배포그룹 생성 - 현재위치 - 환경구성 : EC2 (태그그룹에 Name과 값 선택) - 배포구성 : CodeDeployDefault.AllAtOnce - 로드밸런스는 비활성화
+            - 만약 본인이 배포할 서비스가 2대 이상이면 블루/그린을 선택하면 된다.
+            - 배포구성은 한번 배포 시 몇대의 서버에 배포할지를 결정한다.
+                - 2대 이상이면 1대씩 배포할 지, 30% 혹은 50%로 나눠서 배포할 지 등등 여러 선택을 했겠지만, 1대 서버이다보니 전체배포하는 옵션으로 선택한 것이다.
+    - 이제 Travis와 CodeDeploy를 연동해보자.
+        - S3에서 넘겨줄 zip 파일을 저장할 디렉토리를 EC2에 생성한다.
+            - mkdir ~/app/step2 & mkdir ~/app/step2/zip
+        - AWS CodeDeploy 설정은 appsepc.yml로 한다.
+        - .travis.yml 에도 관련설정 추가한다.
+        - push 로 배포 후, 파일들이 잘 도착했는지 확인해보자.
+            - cd /home/ec2-user/app/step2/zip && ll
+    - 이로써 연동까진 완료되었다! 이제 받은 Jar를 배포해서 실행까지 완료해보자.
+    - step2/deploy.sh에 적어놓겠다.
+    - .travis.yml 다시 수정... 프로젝트의 모든파일을 zip하던 부분을 실제 필요한 파일만 포함하도록 변경한다.
+    - CodeDeploy 명령을 담당할 appspec.yml 수정.
+    - github 푸시 및 배포 확인해보자. 브라우저로 접속까지 테스트
+
+실제 배포하듯이 진행해보겠다.
+    - build.gradle 에서 프로젝트 버전을 변경한다. 1.0 에서 1.0.1로 ..
+    - 간단하게나마 변경내용을 알 수 있도록 index.mustache 버전도 2로 바꿔주자.
+    - 푸시 및 확인
+
+CodeDeploy 로그 확인
+    - AWS 서비스에 오류 발생 시 로그확인법을 알야야 한다. CodeDeploy로 배포가 실패하면 어느 로그를 봐야하는지 간단하게 알아보자.
+    - CodeDeploy에 관한 대부분은 /opt/codedeploy-agent/deployment-root 에 있다. cd 후 ll 해보자
+        - 0453be0-2424-324... 같은 이름의 디렉토리는 CodeDeploy ID 이다.
+            - 여기로 들어가면 배포단위별로 배포파일들이 있다.
+            - 배포파일이 정상적으로 왔는지 확인할 수 있다.
+        - deployment-logs/codedeploy-agent-deployments.log
+            - CodeDeploy 배포 내용 중 표준 입출력내용은 모두 여기에 담겨있다. (즉, echo도 담겨있다.)
+
+이제 마지막으로 무중단 배포를 시도해보자.
+    - 옛날에는 배포가 서비스를 정지해야만 가능할때는 롤백조차 어려웠어서 정말많이 고생했어야 했다. 그래서 배포일에는 새벽까지 모두 남아 준비해야했고..
+    - 무중단 배포는 몇가지 방법이 있다.
+        - AWS Blue-Green
+        - Docker
+        - L4 스위치를 이용 등등...
+            - 얜 워낙 고가장비라 ISP 외에는 쓸 일도 거의없다...
+    - 여기서는 Nginx를 이용해보겠다.
+        - 가장 저렴하고 쉽기 때문. 물론 사내에서 지원이 많다면 걍 AWS Blue-Green 사용하면 끝난다.
+        - 웹서버, 리버스프록시, 캐싱, 로드밸런싱, 미디어 스트리밍 등등을 위한 open source SW이다.
+            - 리버스 프록시는 외부요청을 Nginx가 받아서 Backend server로 요청을 전달하는 기능이다.
+        - Apache가 대세던 자리를 완전히 빼앗은 가장 유명한 웹서버. 고성능이기 때문에 대부분 서비스들이 사용하고 있다.
+        - 기존에 쓰던 EC2에 그대로 적용하면 된다. 범용적이라 사용처가 많다.
+        - 구조는 간단하다. 하나의 EC2에 Nginx 1대와 Jar 2대를 사용하는 것.
+            - Nginx는 80(http), 443(https)를 할당
+            - Boot1은 8081, 2는 8082 할당
+            - 사용자는 80 혹은 443으로 접속하고, Nginx는 현재 연결된 Spring App으로 요청을 넘긴다.
+            - 신규 배포시에는, 지금 쉬고있는 App으로 배포 후 Nginx가 가리키게 하면 된다. (nginx reload : 0.1초 내에 완료된다.)
+    - sudo yum install nginx
+    - sudo service nginx start
+    - 보안그룹추가 -> 80번 포트를 모든 주소에 뚫어놓는다.
+    - 8080에서 80으로 서비스주소가 변경되니, 구글과 네이버 로그인에도 변경주소를 등록한다. 승인된 리디렉션 url에 8080을 제거하면 된다.
+        - http는 80이 기본이라 포트를 걍 없애면 되는 것이다.
+        - 8080으로 엔진엑스가 리다이렉트 할 예정이므로, 8080도 남겨둔다.
+    - EC2 도메인으로만 접근해서 Nginx가 잘 뜨는지 확인
+    - Nginx 가 실행중인 SpringBoot App 가리키도록 프록시 설정
+        - sudo vi /etc/nginx/nginx.conf
+            - 내용 중 server 하위의 location / 을 찾아서 다음과 같이 추가한다.
+            location / {
+                proxy_pass http://localhost:8080 # 엔진엑스로 요청이 오면 localhost:8080으로 전달한다.
+                # 아래 3개는 실제 요청데이터를 header의 각 항목에 할당한다.
+                proxy_set_header X-Real-IP $remote_addr; # 요청자의 IP를 저장한다.
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header Host $http_host;
+            }
+    - sudo service nginx restart
+    - 브라우저 접속 잘 되는지 확인
+    - 무중단 배포 스크립트 제작 - step3의 deploy.sh
+        - 일단 그 전에, 배포시에 8081, 8082 중 선택판단기준이 될 API를 하나 추가하겠다.
+        - ProfileController를 만든다.
+        - 대응되는 test도 만들어본다.
+    - 현재 profile은 real 밖에 없으니, real1, real2도 생성해보자.
+        - 둘은 Travis CI 배포자동화를 위한 profile이다.
+            - 각각 포트번호 등등이 담겨있다. 이제 github 푸시해보자.
+    - Nginx 설정수정
+        - 무중단 배포의 핵심이다. 배포마다 프록시설정이 순식간에 교체되도록 설정해보자.
+        - sudo vi /etc/nginx/conf.d/service-url.inc
+            - conf.d에 nginx 설정들이 모여있다.
+            - set $service_url http://127.0.0.1:8080; 입력
+        - 방금 만든 파일을 nginx가 사용할 수 있게 한다.
+            - sudo vi /etc/nginx/nginx.conf
+            - location / 부분을 다음과 같이 변경
+            include /etc/nginx/conf.d/service-url.inc; # 리다이렉트주소를 설정파일에서 읽어온다. 이 파일을 조작해서 작동시킨다.
+
+            location / {
+                proxy_pass $service_url; # location 에서는 이부분만 바뀌었다. 무조건 8080으로 전달하던 것이.. 설정파일에 따라 달라진다.
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header Host $http_host;
+            }
+        - 무중단배포 스크립트 작성
+            - mkdir ~/app/step3 && mkdir ~/app/step3/zip
+            - appspec.yml 역시 step3으로 배포되도록 수정 (destination을 수정하면 된다.)
+            - 배포 스크립트는 총 5개로 구성할 것이다.
+                - stop.sh : 기존 엔진엑스에 연결되진 않았지만 실행중이던 Boot 종료
+                - start.sh : 배포할 신규버전을 stop.sh로 종료한 'profile' 로 실행
+                - health.sh : start.sh 로 실행한 프로젝트가 잘 작동하는지 체크
+                - switch.sh : 엔진엑스가 바라보는 Boot를 최신버전으로 변경
+                - profile.sh : 앞선 4개의 스크립트에서 공통으로 사용할 'profile' 과 포트체크 로직
+            - appspec.yml에 위 스크립트들을 사용하도록 설정한다.
+                - step3은 걍 scripts에 쌩으로 올려버린다.
+    - 마지막으로 잦은 배포로 인한 Jar 파일명 겹치는 문제를 수정하겠다.
+        - build.gradle에 version을 날짜반영하게 수정한다.
+
+이로써 모든 배포가 끝났다.... ps -ef | grep java로 2개의 App이 실행되고 있음을 볼 수 있다! 정말 수고 많았다!!!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
