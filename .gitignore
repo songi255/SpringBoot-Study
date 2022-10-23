@@ -3,9 +3,11 @@
 .gradle
 .idea
 # 구글서비스 인증정보는 중요한 보안으로, 유출되어서는 안된다.
-application-oauth.properties
+# application-oauth.properties
 # RDS 연동정보도 숨긴다.
-application-real-db.properties
+# application-real-db.properties
+# 어차피 private이니 걍 올린다. 비번이랑 이런건 살짝식 바꿨다.
+
 # 여기 추가했는데도 여전히 커밋목록에 나온다면, Git 캐시문제 때문이다.
 # git rm -r --cached .
 # git add .
