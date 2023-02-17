@@ -30,6 +30,7 @@
     - IFTTT
         - If This Then That의 약자.
         - 직접 나만의 연동템플릿을 만들 수도 있다.
+        -> 이게 걍 AWS Lambda 아닌가
 
 방문자 분석
     - 구글 애널리틱스
